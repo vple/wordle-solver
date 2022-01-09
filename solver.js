@@ -45,6 +45,56 @@ const isCandidateWord = (word, candidates, letterCount) => {
   return true;
 };
 
+const filterToCandidates = (dictionary, candidates, letterCount) => {
+  return _.filter(dictionary, (word) => isCandidateWord(word, candidates, letterCount));
+};
+
+const frequencyDistribution = (dictionary) => {
+  return _.countBy(_.flatMap(dictionary, (word) => _.split(word, '')));
+};
+
+/**
+ * Scores a guess. Aims to produce a higher score for a guess that produces more information.
+ */
+// Current algo tries to get words with unknown letters with the highest frequency distribution.
+const scoreGuess = (guess, frequencyDistribution, excludeLetters) => {
+//   const letters = _.filter(_.uniq(_.split(guess, '')), (letter) => excludeLetters.indexOf(letter) < 0);
+  const letters = _.uniq(_.split(guess, ''));
+  const score = 
+        _.reduce(
+          _.map(letters, (letter) => {
+            if (excludeLetters.indexOf(letter) >= 0) {
+              // Seems better to have a known letter than a letter that only appears once?
+              return 2;
+            }
+            return frequencyDistribution[letter] ?? 0
+          }), 
+          _.multiply);
+  return score;
+}
+
+const scoreGuess2 = (guess, candidates, letterCount, remainingDictionary) => {
+  let guessCandidates = [];
+  
+  const guessCount = _.countBy(guess);
+  const duplicates = _.keys(_.pickBy(guessCount, n => n > 1));
+  
+  let letterAbsentScore = 0;
+  const candidateAbsentEliminations = [];
+    
+  // Letters that we aren't sure are in/not in the answer.
+  const unknownLetters = _.filter(_.uniq(_.flatMap(remainingDictionary, (word) => _.split(word, ''))));
+  
+  const dictionaryCandidateDistribution = _.countBy(_.flatMap(remainingDictionary, (word) => _.map(word, (letter, index) => [letter, index])));
+  const dictionaryLetterDistribution = _.countBy(_.flatMap(remainingDictionary, (word) => _.split(word, '')));
+  const orderedLetterDistribution = _.reverse(_.sortBy(_.toPairs(dictionaryLetterDistribution), [1]));
+  console.log(orderedLetterDistribution);
+
+  // Multiplies counts of unknown letters. Each letter counted once.
+  const score = _.reduce(_.map(_.filter(unknownLetters, (letter) => guess.indexOf(letter) >= 0), (letter) => dictionaryLetterDistribution[letter]), _.multiply);
+  return score;
+};
+
 const guess = () => {
   const app = new wordle.bundle.GameApp();
   
@@ -55,6 +105,8 @@ const guess = () => {
     const guess = app.boardState[row];
     const evaluation = app.evaluations[row];
     const rowLetterCount = {};
+    const guessCount = _.countBy(guess);
+    const duplicates = _.keys(_.pickBy(guessCount, n => n > 1));
     
     // NOTE: This still handles duplicates pretty naively.
     for (let i = 0; i < 5; i++) {
@@ -63,7 +115,7 @@ const guess = () => {
       switch (letterEvaluation) {
         case 'absent':
           // Only eliminate letter if it's not a duplicate.
-          if (!rowLetterCount[letter]) {
+          if (duplicates.indexOf(letter) < 0) {
             _.remove(candidates, c => c[0] === letter);
           }
           break;
@@ -85,12 +137,23 @@ const guess = () => {
     _.mergeWith(letterCount, rowLetterCount, (total, row) => _.max([total, row]));
   }
     
-//   console.log(candidates, letterCount);
-//   window.candidates = candidates;
-//   window.letterCount = letterCount;
+  window.candidates = candidates;
+  window.letterCount = letterCount;
   const eligibleWords = _.filter(DICTIONARY, (word) => isCandidateWord(word, candidates, letterCount));
   console.log(eligibleWords);
+  window.eligibleWords = eligibleWords;
   
-  // TODO: More efficient guessing.
-  return eligibleWords[0];
+  const eligibleFrequencyDistribution = frequencyDistribution(eligibleWords);
+  window.eligibleFrequencyDistribution = eligibleFrequencyDistribution;
+  
+  const bestGuess = _.maxBy(DICTIONARY, (word) => {
+    let score = scoreGuess(word, eligibleFrequencyDistribution, _.keys(letterCount));
+    // We want to favor eligible words, but balanced against the amount of knowledge we gain.
+    if (eligibleWords.indexOf(word) >= 0) {
+      // Not sure what constant to use / when this takes effect.
+      score += 1;
+    }
+    return score;
+  });
+  return bestGuess;
 };
