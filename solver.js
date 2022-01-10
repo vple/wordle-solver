@@ -155,5 +155,12 @@ const guess = () => {
     }
     return score;
   });
+  
+  const bestEligibleGuess = _.maxBy(eligibleWords, (word) => {
+    let score = scoreGuess(word, eligibleFrequencyDistribution, _.keys(letterCount));
+    return score;
+  });
+  console.log(bestEligibleGuess);
+  
   return bestGuess;
 };
