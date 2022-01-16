@@ -116,7 +116,11 @@ const guess = () => {
         case 'absent':
           // Only eliminate letter if it's not a duplicate.
           if (duplicates.indexOf(letter) < 0) {
+            // Eliminate letter.
             _.remove(candidates, c => c[0] === letter);
+          } else {
+            // Remove this letter at this index.
+            _.remove(candidates, c => _.isEqual(c, [letter, i]));
           }
           break;
         case 'present':

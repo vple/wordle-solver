@@ -186,6 +186,8 @@ def play_botfights(bot, username, password, event):
             guess = get_play(bot, history[i])
             guesses[i] = guess
             history[i].append([guess, None])
+            if round_num >= 10:
+                print(history[i])
         payload = {'guesses': guesses}
         round_num += 1
         print('Round %d, %d words to go ...' % (round_num, len(guesses)))
